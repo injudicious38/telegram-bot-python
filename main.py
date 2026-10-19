@@ -1,44 +1,62 @@
+
 import os
 import time
 import telebot
 from dotenv import load_dotenv
 from commands import register_commands
 
-# Load environment variables
 load_dotenv()
 
-# Replace 'TELEGRAM_BOT_TOKEN' with the token you received from BotFather
-TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
+TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+
 try:
+    if not TOKEN:
+        raise ValueError("TELEGRAM_BOT_TOKEN is missing")
+
     bot = telebot.TeleBot(TOKEN)
     register_commands(bot)
 
-    @bot.message_handler(commands=['start', 'hello'])
+    @bot.message_handler(commands=["start", "hello"])
     def send_welcome(message):
-        """
-        Handle '/start' and '/hello' commands.
+        bot.reply_to(
+            message,
+            "Hello! 👋 Welcome to my bot.\n\n"
+            "I'm here to help. Send /help to see my commands!"
+        )
 
-        Args:
-            message (telebot.types.Message): The message object.
-        """
-        bot.reply_to(message, "Hello! I'm a simple Telegram bot.")
+    # Automatically welcome new members in groups
+    @bot.message_handler(
+        content_types=["new_chat_members"]
+    )
+    def welcome_new_members(message):
+        for member in message.new_chat_members:
+            if member.is_bot:
+                continue
 
-    @bot.message_handler(func=lambda msg: True)
+            welcome_text = (
+                f"👋 Welcome to the group, {member.first_name}!\n\n"
+                "We're glad you're here! 🎉\n"
+                "Please read the group rules and enjoy your stay."
+            )
+
+            bot.send_message(
+                message.chat.id,
+                welcome_text
+            )
+
+    # Echo text messages in private chats only
+    @bot.message_handler(
+        func=lambda msg: msg.chat.type == "private",
+        content_types=["text"]
+    )
     def echo_all(message):
-        """
-        Echo all incoming text messages back to the user.
-
-        Args:
-            message (telebot.types.Message): The message object.
-        """
         bot.reply_to(message, message.text)
 
     # Remove webhook to avoid conflicts with polling
     bot.delete_webhook(drop_pending_updates=True)
-    bot.polling()
+    print("Bot is running!")
+    bot.infinity_polling()
 
 except Exception as e:
-    print(f"CRITICAL ERROR: Failed to initialize bot with provided token. Error: {e}")
-    print("The application will hang to prevent a restart loop. Please fix the TELEGRAM_BOT_TOKEN environment variable.")
-    while True:
-        time.sleep(3600)
+    print(f"Bot error: {e}")
+    raise
